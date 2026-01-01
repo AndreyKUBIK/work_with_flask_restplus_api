@@ -2,43 +2,53 @@ from flask import Flask
 from flask_restx import Api, Resource, fields
 
 app = Flask(__name__)
-api = Api(
-    app,
-    title="Todo API",
-    description="GET и PUT",
-)
+api = Api(app, title="Exhibition API", description="API для выставок")
 
-todos = {}
+ns = api.namespace('exibitions', description='Операции с выставками')
 
-todo_model = api.model('Todo', {
-    'data': fields.String(required=True, description='Текст задачи')
+exhibitions = {}
+
+exhibiton_model = api.model('Exhibition', {
+    'name': fields.String(required=True, description='Название выставки'),
+    'author': fields.String(required=True, description='Компания-организатор'),
+    'theme': fields.String(required=True, description='Тематика выставки'),
+    'price': fields.Integer(required=True, description='Стоимость билета'),
+    'available': fields.Boolean(required=True, description='Билеты в наличии или нет')
 })
 
 
-@api.route('/todo/<string:todo_id>')
-class Todo(Resource):
+@ns.route('/<int:exibition_id>')
+class Exhibition(Resource):
 
-    @api.response(200, 'Задача найдена')
-    @api.response(404, 'Задача не найдена')
-    def get(self, todo_id):
-        if todo_id not in todos:
-            api.abort(404, f"Задача {todo_id} не найдена")
-
+    @ns.expect(exhibiton_model)
+    def put(self, exhibition_id):
+        """
+        Добавить или обновить выставку по ID
+        """
+        exhibitions[exhibition_id] = api.payload
         return {
-            "todo_id": todo_id,
-            "data": todos[todo_id]
-        }
+            "message": "Выставка сохранена",
+            "id": exhibition_id,
+            "Exhibition": exhibitions[exhibition_id]
+        }, 200
+
+    def get(self, exhibition_id):
+        """
+        Получить выставку по ID
+        """
+        if exhibition_id not in exhibitions:
+            api.abort(404, "Выставка не найдена")
+        return exhibitions[exhibition_id]
 
 
-    @api.expect(todo_model)
-    @api.response(200, 'Задача сохранена')
-    def put(self, todo_id):
-        todos[todo_id] = api.payload['data']
+@ns.route('/')
+class ExhibitionList(Resource):
 
-        return {
-            "todo_id": todo_id,
-            "data": todos[todo_id]
-        }
+    def get(self):
+        """
+        Получить список всех выставок
+        """
+        return exhibitions
 
 
 if __name__ == '__main__':
