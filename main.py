@@ -1,14 +1,19 @@
+#Библиотеки
 from flask import Flask
 from flask_restx import Api, Resource, fields, reqparse
+import statistics
 
+#Заголовки
 app = Flask(__name__)
 api = Api(app, title="Exhibition API", description="API для выставок")
 
-ns = api.namespace('exibitions', description='Операции с выставками')
+ns = api.namespace('exhibitions', description='Операции с выставками')
 
+#Оперативная память
 exhibitions = {}
 
-exhibiton_model = api.model('Exhibition', {
+#Модель выставок
+exhibition_model = api.model('Exhibition', {
     'name': fields.String(required=True, description='Название выставки'),
     'Company': fields.String(required=True, description='Компания-организатор'),
     'theme': fields.String(required=True, description='Тематика выставки'),
@@ -16,6 +21,7 @@ exhibiton_model = api.model('Exhibition', {
     'available': fields.Boolean(required=True, description='Билеты в наличии или нет')
 })
 
+#Скелет сортировки и фильтрации
 exhibition_list_parser = reqparse.RequestParser()
 exhibition_list_parser.add_argument('name', type=str, help='Название')
 exhibition_list_parser.add_argument('company', type=str, help='Компания-организатор')
@@ -38,10 +44,12 @@ exhibition_list_parser.add_argument(
     help='Порядок сортировки'
 )
 
-@ns.route('/<int:exibition_id>')
+#Функции для работы с добавлением/изменением/удалением выставок
+@ns.route('/<int:exhibition_id>')
 class Exhibition(Resource):
 
-    @ns.expect(exhibiton_model)
+    @ns.expect(exhibition_model)
+    #Добавление или изменение
     def put(self, exhibition_id):
         """
         Добавить или обновить выставку по ID
@@ -53,6 +61,7 @@ class Exhibition(Resource):
             "Exhibition": exhibitions[exhibition_id]
         }, 200
 
+    #Вывод выставки по ID
     def get(self, exhibition_id):
         """
         Получить выставку по ID
@@ -60,7 +69,8 @@ class Exhibition(Resource):
         if exhibition_id not in exhibitions:
             api.abort(404, "Выставка не найдена")
         return exhibitions[exhibition_id]
-
+    
+    #Удаление выставки
     def delete(self, exhibition_id):
         """
         Удаление выставки
@@ -72,6 +82,7 @@ class Exhibition(Resource):
             "exhibition": deleted_exhibition
         }, 200
     
+    # Получение всех выставок, фильтрация и сортировка по желанию
     @ns.expect(exhibition_list_parser)
     def get(self):
         """
@@ -99,6 +110,27 @@ class Exhibition(Resource):
 
         return result, 200
 
+    # avg, min, max цены билетов
+    @ns.route('/stats')
+    class ExhibitionStats(Resource):
 
+        def get(self):
+            """
+            Минимальная, максимальная и средняя цена билетов
+            """
+            if not exhibitions:
+                return {
+                    "message": "Нет данных для анализа"
+                }, 200
+
+            price = [exhibition['price'] for exhibition in exhibitions.values()]
+
+            return {
+                "min_price": min(price),
+                "max_price": max(price),
+                "avg_price": round(statistics.mean(price), 2)
+            }, 200
+
+#Старт программы
 if __name__ == '__main__':
     app.run(debug=True)
