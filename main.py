@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_restx import Api, Resource, fields
+from flask_restx import Api, Resource, fields, reqparse
 
 app = Flask(__name__)
 api = Api(app, title="Exhibition API", description="API для выставок")
@@ -10,12 +10,33 @@ exhibitions = {}
 
 exhibiton_model = api.model('Exhibition', {
     'name': fields.String(required=True, description='Название выставки'),
-    'author': fields.String(required=True, description='Компания-организатор'),
+    'Company': fields.String(required=True, description='Компания-организатор'),
     'theme': fields.String(required=True, description='Тематика выставки'),
     'price': fields.Integer(required=True, description='Стоимость билета'),
     'available': fields.Boolean(required=True, description='Билеты в наличии или нет')
 })
 
+exhibition_list_parser = reqparse.RequestParser()
+exhibition_list_parser.add_argument('name', type=str, help='Название')
+exhibition_list_parser.add_argument('company', type=str, help='Компания-организатор')
+exhibition_list_parser.add_argument('theme', type=str, help='Тематика')
+exhibition_list_parser.add_argument('price', type=int, help='Стоимость билета')
+exhibition_list_parser.add_argument('available', type=bool, help='В наличии')
+
+exhibition_list_parser.add_argument(
+    'sort_by',
+    type=str,
+    choices=('name', 'company', 'theme', 'price', 'available'),
+    help='Поле сортировки'
+)
+
+exhibition_list_parser.add_argument(
+    'order',
+    type=str,
+    choices=('asc', 'desc'),
+    default='asc',
+    help='Порядок сортировки'
+)
 
 @ns.route('/<int:exibition_id>')
 class Exhibition(Resource):
@@ -51,14 +72,32 @@ class Exhibition(Resource):
             "exhibition": deleted_exhibition
         }, 200
     
-@ns.route('/')
-class ExhibitionList(Resource):
-
+    @ns.expect(exhibition_list_parser)
     def get(self):
         """
-        Получить список всех выставок
+        Получить список выставок с фильтрацией и сортировкой
         """
-        return exhibitions
+        args = exhibition_list_parser.parse_args()
+
+        result = [
+            {"id": exhibition_id, **exhibition}
+            for exhibition_id, exhibition in exhibitions.items()
+        ]
+
+        for field in ('name', 'company', 'theme', 'price', 'available'):
+            if args[field] is not None:
+                result = [
+                    b for b in result
+                    if b[field] == args[field]
+                ]
+
+        if args['sort_by']:
+            result.sort(
+                key=lambda x: x[args['sort_by']],
+                reverse=(args['order'] == 'desc')
+            )
+
+        return result, 200
 
 
 if __name__ == '__main__':
