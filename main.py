@@ -40,7 +40,17 @@ class Exhibition(Resource):
             api.abort(404, "Выставка не найдена")
         return exhibitions[exhibition_id]
 
-
+    def delete(self, exhibition_id):
+        """
+        Удаление выставки
+        """
+        deleted_exhibition = exhibitions.pop(exhibition_id)
+        return {
+            "message": "Выставка удалена",
+            "id": exhibition_id,
+            "exhibition": deleted_exhibition
+        }, 200
+    
 @ns.route('/')
 class ExhibitionList(Resource):
 
